@@ -41,12 +41,7 @@ static GtkListStore * store;
 */ 
 int getCPUticks (){
     
-/*    int userTime;
-    int niceTime;
-    int systemTime;
-    int irqTime;
-    int softirqTime;
-*/    int totalCPUtime = 0;
+    int totalCPUtime = 0;
     char userTime[MAX_WORD];
     char niceTime[MAX_WORD];
     char systemTime[MAX_WORD];
@@ -60,35 +55,23 @@ int getCPUticks (){
     // read all lines from /proc/stat into cpuTickLine
     while (fgets (cpuTickLine, MAX_FILE, cpuProc) != NULL){
         if (cpuTickLine [0] == 'c'){
-            /* tokenize the line string into Time categories:
-                user(1), nice(2), systemTime(3), irq(6), and softirq(7)*/
-            strtok (cpuTickLine, " ");
-            /*userTime = atoi (strtok (NULL, " "));
-            niceTime = atoi (strtok (NULL, " "));
-            systemTime = atoi (strtok (NULL, " "));
-            strtok (NULL, " ");
-            strtok (NULL, " ");
-            irqTime = atoi (strtok (NULL, " "));
-            softirqTime = atoi (strtok (NULL, " "));
-            */
-            strcpy (userTime, strtok (NULL, " "));
-            strcpy (niceTime, strtok (NULL, " "));
-            strcpy (systemTime, strtok (NULL, " "));
-            strtok (NULL, " ");
-            strtok (NULL, " ");
-            strcpy (irqTime, strtok (NULL, " "));
-            strcpy (softirqTime, strtok (NULL, " "));
             
-
+            char * lineStart;
+            lineStart = cpuTickLine + 4;
+            char * end = lineStart;
+            for (int i = 0; i < 7; i++){
+                int n = strtol (lineStart, &end, 10);
+                if (i == 0 || i == 1 || i == 2 || i == 5 || i == 6){
+                    totalCPUtime += n;
+                }
+                lineStart = end;
+            }
             //printf ("%d\t%d\t%d\t%d\t%d\n", userTime, niceTime, systemTime, irqTime, softirqTime);
         }
         else { break; }
     }
     fclose (cpuProc);
     
-    // return the total number of CPU ticks
-    //totalCPUtime = userTime + niceTime + systemTime + irqTime + softirqTime;
-    totalCPUtime = atoi (userTime) + atoi (niceTime) + atoi (systemTime) + atoi (irqTime) + atoi (softirqTime);
     return totalCPUtime;
 }
 
