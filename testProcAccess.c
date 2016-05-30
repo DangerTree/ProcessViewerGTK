@@ -1,4 +1,18 @@
-// file tests proc data access
+/* Sarah Gunderson. CSCI 352 UNIX. Spring 2016. Dr Bover.
+
+    testProcAccess.c is the driver function for the process monitor
+        it depends on gtkProcStruct.c
+
+    HOW:
+-A pidNode contains all process info for a process
+-pidArray is a static array of pidStructs created to hold current pid info
+    
+    ~In update, the program reads each numerical directory in /proc and adds all info to a pidNode and puts the node in the pidList.
+    ~The Node is then added to the list store (LS) to be displayed
+    ~update is called every second
+    ~Next time, if pid is already in list store, update cpu % and mem vals and delete dead processes whose pid < thisPid
+    ~If pid is not in LS, create a new pidNode, add it to the pidArray, and delete dead processes whose pid < thisPid 
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +21,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <gtk/gtk.h>
+#include <gtk/gtktreemodelsort.h>
 #include <stdbool.h>
 #include "gtkProcStruct.h"
 
@@ -23,7 +38,6 @@ typedef struct pidNode{
     gfloat cpu_percent;
     gint pid;
     gfloat mem_using;
-    //gchar * mem_using;
     int oldProcTicks;
     int oldCpuTicks;
 } pidNode;
@@ -76,7 +90,7 @@ int calcProcTicks(char * pidPath){
     // open stat file
     char statPath [MAX_WORD];
     strncat (strncpy (statPath, pidPath, strlen(pidPath)+1), "/stat", 6);
-    char statLine [MAX_FILE]; // this is way too big
+    char statLine [MAX_FILE];
     int newProcTicks = 0;
 
     // get sum of utime and stime of process from /proc/[pid]/stat
@@ -87,7 +101,6 @@ int calcProcTicks(char * pidPath){
     
     if (fgets (statLine, MAX_FILE, pidStat) != NULL){
         // go to 14th string in stat, utime
-
         char * lineStart = statLine;
         char * end = lineStart;
         // move lineStart to point to #3 position in statLine (after chars)
@@ -100,9 +113,10 @@ int calcProcTicks(char * pidPath){
         free (junk2);
         free (junk3);
 
+        // offset to the third token after the chars
         lineStart += offset;
         
-        // for the first 15 things in stat, add the 14th and 15th strings (utime, stime) to total time
+        // for the next 12 things in stat, add the 14th and 15th strings (utime, stime) to total time
         for (int i = 3; i < 15; i++){
             int n = strtol (lineStart, &end, 10);
             if (i == 13 || i == 14){
@@ -139,7 +153,7 @@ void calcCPU (pidNode * pNode, char * pidPath, int isNew){
     cpuPrcnt = cpuPrcnt * 100;    
 
     char retStr [20];
-    snprintf (retStr, 20, "%.2f", cpuPrcnt);
+    snprintf (retStr, 20, "%.2f", cpuPrcnt); 
     gfloat toRet = (gfloat) atof (retStr);
     pNode->cpu_percent = toRet;
     // update pNode tick vals
@@ -149,7 +163,6 @@ void calcCPU (pidNode * pNode, char * pidPath, int isNew){
 
 
 // getProcName returns the Process Name of a pid
-//char * getProcName (char * pidPath){
 gchar * getProcName (pidNode * pNode, char * pidPath){
 
     // set procCommPath = proc/[pid]/comm    
@@ -164,7 +177,7 @@ gchar * getProcName (pidNode * pNode, char * pidPath){
     }
     fgets (procName, pathLen, pid);
     fclose (pid);
-    printf("\t%s", procName);
+    //printf("\t%s", procName);  FOR TESTING
     
     int pNameSize = strlen(procName) + 1;
     char * pNameStr = malloc (pNameSize);
@@ -173,7 +186,7 @@ gchar * getProcName (pidNode * pNode, char * pidPath){
 }
 
 
-// getMem returns the size of the program from a pid's statm, and converts to MB
+// getMem returns the gfloat size of the program in MB from a pid's statm
 gfloat getMem (char * pidPath){
     
     char procStatm [MAX_WORD];
@@ -186,41 +199,19 @@ gfloat getMem (char * pidPath){
 
     // in the unlikely chance that the proc ended since getMem was called
     if (memFile == NULL){
-        //gchar * toRet = "N/A\0";
-        //return toRet;
         return (gfloat) 0.0;
     }
 
+    // get total page # for process
     fgets (memStrRaw, MAX_WORD, memFile);
     gfloat memUsed = atoi (strtok (memStrRaw, " "));
     fclose (memFile);
     
-    printf ("\t%f", memUsed);           
+    // printf ("\t%f", memUsed);  FOR TESTING 
 
     memUsed = memUsed * 4 / 1024; // get size in MB
 
     return (gfloat) memUsed;
-
-    // charMemUsed is char rep of int with two decimal places
-    /*char * memStrDone = malloc (16);
-    char * charMemUsed = malloc (16);
-    sprintf (charMemUsed, "%.2f", memUsed);
-    if (memUsed != 0){
-        if (strlen(charMemUsed) < 7){ // KB
-            //memUsed = memUsed;
-            sprintf (memStrDone, "%.2f", memUsed);
-            strncat (memStrDone, " KB\0", 4);
-        }
-        else {
-            memUsed = memUsed / 1024;
-            sprintf (memStrDone, "%.2f", memUsed);
-            strncat (memStrDone, " MB\0", 4);
-        }
-    }
-    else {
-        memStrDone = "N/A\0";
-    }*/
-    //return (gchar *) memStrDone;
 }
 
 
@@ -241,34 +232,16 @@ gchar * getUserName (char * pidPath){
     strncpy (holder, pwd->pw_name, usrNameSize);
     holder [usrNameSize] = '\0';
     strncpy (user, holder, usrNameSize+1);
-    printf("\t%s", user);
+    // printf("\t%s", user);   FOR TESTING
     
     free (fileStat);
     return (gchar *) user;
 }
 
 
-/* addNewLSRow creates a new row for data in a list store,
-and populates it with data from a pidNode
-*/
-void addNewLSRow (pidNode * newNode, GtkTreeIter * iter, GtkListStore * store){
-
-    // create a new row in listStore
-    gtk_list_store_append (store, iter);
-
-    // add the pidNode to the listStore
-    gtk_list_store_set (store, iter, PROC_NAME, newNode->proc_name, 
-                                    USER_NAME, newNode->user_name,
-                                    CPU_PERCENT, newNode->cpu_percent,
-                                    PID, newNode->pid,
-                                    MEM_USING, newNode->mem_using, -1);
-}
-
-
 // free pidArray of dead processes and updates LS iterator
 void refreshListStore (GtkListStore * store, GtkTreeIter * iter, int pidNum){ 
     int ctr = 0;
-    //gboolean valid = TRUE;    
     gint LSpid;
 
     // while the iter is not to the end of the LS
@@ -276,20 +249,18 @@ void refreshListStore (GtkListStore * store, GtkTreeIter * iter, int pidNum){
         // and the listStore iter-> pid != this pid
         gtk_tree_model_get (GTK_TREE_MODEL (store), iter, PID, &LSpid, -1);
         LSpid = (int) LSpid;
-        // delete the row from the listStore
+        // delete the row from the listStore and pidList
         if (LSpid < pidNum){
-            // delete the that pid from the pidList
             pidArray [LSpid] = NULL;
             gtk_list_store_remove (GTK_LIST_STORE (store), iter);
             ctr ++;
-            // if iter is not pointing to 
         }
         else { break; }
     }
-    //return ctr;
 }
 
 
+// addNewRow sets the list store with data, incl an image dep. on user_name
 void addNewRow (pidNode * newNode, GtkTreeIter * iter, int updateCntr){
     // add the process info to new row in liststore
     //gtk_list_store_append (store, &iter);
@@ -338,19 +309,19 @@ int update (GtkListStore * store){
     while ((procDirent = readdir (procDir)) != NULL){
         pid = procDirent->d_name;
         if (pid[0] >= 48 && pid[0] <= 57){
-            printf("%s\t", pid);            
+            // printf("%s\t", pid);   FOR TESTING 
             int pidNum = atoi (pid); // store pid
 
             updateCntr++;
 
             // store /proc/[pid] path
             strncat (pidPath, pid, strlen(pid));
-            printf("%s\t", pidPath);
+            // printf("%s\t", pidPath);   FOR TESTING
             
             // UPDATE PIDARRAY AND LIST STORE
-            // if pid is in the pidArray, update memUsed and cpu%
+            // if pid is in the pidArray, update memUsed and cpu% in [] + LS
             if (pidArray [pidNum] != NULL){
-                pidArray [pidNum] -> mem_using = getMem (pidPath);//memUsed;
+                pidArray [pidNum] -> mem_using = getMem (pidPath);
                 calcCPU (pidArray [pidNum], pidPath, 0);
                 
                 // remove old processes, set iter to correct row
@@ -361,11 +332,7 @@ int update (GtkListStore * store){
                 
                 // set iterator to next row
                 valid = gtk_tree_model_iter_next (GTK_TREE_MODEL (store), iter);
-                // if iter is at end of LS, append a row in case there is more pids to store
-/*                if (nextIter == FALSE){
-                    gtk_list_store_append (store, &iter);
-                }
-*/                printf("\n");
+                // printf("\n");   FOR TESTING
             }
 
             // if pid is not in the pidArray
@@ -376,7 +343,6 @@ int update (GtkListStore * store){
                 newNode->user_name = getUserName (pidPath);
                 newNode->pid = (gint) pidNum;
                 newNode->proc_name = getProcName (newNode, pidPath);
-                //newNode->image = getImage (char * userName);
                 calcCPU (newNode, pidPath, 1);
 
                 // add the pid to the pidList
@@ -386,24 +352,9 @@ int update (GtkListStore * store){
                 if (valid){
                     refreshListStore (store, iter, pidNum);
                 }
-                
                 addNewRow (newNode, iter, updateCntr);
-
-                // add the process info to new row in liststore
-                //gtk_list_store_append (store, &iter);
-/*                gtk_list_store_insert_with_values (
-                                    store, iter, updateCntr,
-                                    PROC_NAME, newNode->proc_name, 
-                                    USER_NAME, newNode->user_name,
-                                    CPU_PERCENT, newNode->cpu_percent,
-                                    PID, newNode->pid,
-                                    MEM_USING, newNode->mem_using, -1);
-  */              
                 valid = gtk_tree_model_iter_next (GTK_TREE_MODEL (store), iter);
-                // add the pidNode to the listStore
-/*                gtk_list_store_set (store, &iter, PROC_NAME, newNode->proc_name, USER_NAME, newNode->user_name, CPU_PERCENT, newNode->cpu_percent, PID, newNode->pid, MEM_USING, newNode->mem_using, -1);
-                addNewLSRow (newNode, iter, store);
-*/            }
+            }
 
             // reset path to "/proc/" by appending a null char
             pidPath[6] = '\0';}
@@ -413,6 +364,50 @@ int update (GtkListStore * store){
 }
 
 
+// setSorts makes all cols sortable by setting sorting funcs
+void setSorts (GtkTreeModel * sortmodel){
+    
+    // make process names sortable
+    gtk_tree_sortable_set_sort_func (GTK_TREE_SORTABLE (sortmodel),
+                            PROC_NAME, sort_alphabatize,
+                            GINT_TO_POINTER (PROC_NAME), NULL);
+    
+    gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (sortmodel), 
+                            PROC_NAME,  GTK_SORT_ASCENDING);
+
+    // make user names sortable
+    gtk_tree_sortable_set_sort_func (GTK_TREE_SORTABLE (sortmodel),
+                            USER_NAME, sort_alphabatize,
+                            GINT_TO_POINTER (PROC_NAME), NULL);
+    
+    gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (sortmodel), 
+                            USER_NAME,  GTK_SORT_ASCENDING);
+
+    // make cpu % sortable
+    gtk_tree_sortable_set_sort_func (GTK_TREE_SORTABLE (sortmodel),
+                            CPU_PERCENT, sort_numbers,
+                            GINT_TO_POINTER (CPU_PERCENT), NULL);
+    
+    gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (sortmodel), 
+                            CPU_PERCENT,  GTK_SORT_DESCENDING);
+
+    // make PID sortable
+    gtk_tree_sortable_set_sort_func (GTK_TREE_SORTABLE (sortmodel),
+                            PID, sort_numbers,
+                            GINT_TO_POINTER (PID), NULL);
+    
+    gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (sortmodel), 
+                            PID,  GTK_SORT_ASCENDING);
+
+    // make Mem sortable
+    gtk_tree_sortable_set_sort_func (GTK_TREE_SORTABLE (sortmodel),
+                            MEM_USING, sort_numbers,
+                            GINT_TO_POINTER (MEM_USING), NULL);
+    
+    gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (sortmodel), 
+                            MEM_USING,  GTK_SORT_ASCENDING);
+}
+
 
 int main (){
 
@@ -420,26 +415,21 @@ int main (){
 
     store = gtk_list_store_new (COLUMNS, GDK_TYPE_PIXBUF, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_FLOAT, G_TYPE_INT, G_TYPE_FLOAT);
 
-    // initiate sorting
-    // ---------------------
-    GtkTreeSortable * sortable = GTK_TREE_SORTABLE (store);
+    // sortmodel can be sorted in the tree view without messing order of LS
+    GtkTreeModel * sortmodel;
+    sortmodel = gtk_tree_model_sort_new_with_model (GTK_TREE_MODEL (store));
 
-    gtk_tree_sortable_set_sort_func (sortable, PROC_NAME, sort_proc_names, GINT_TO_POINTER (PROC_NAME), NULL);
-    
-    gtk_tree_sortable_set_sort_column_id (sortable, PROC_NAME, 
-                                        GTK_SORT_ASCENDING);
-    
+    // add values to LS
     update (store);
     
-    // create treeview (columns)
-    GtkWidget *treeview = gtk_tree_view_new ();
-    build_treeview (treeview);
-
     // create timeout refresh
     g_timeout_add_seconds (1, (GSourceFunc) update, (gpointer) store);
     
-    // add the model to the tree view
-    gtk_tree_view_set_model (GTK_TREE_VIEW (treeview), GTK_TREE_MODEL (store));
+    // create treeview using the sortable list store
+    GtkWidget * treeview = gtk_tree_view_new_with_model (GTK_TREE_MODEL (sortmodel));
+
+    // set up the column
+    build_treeview (treeview);
 
     // unreference the model so it will be destroyed when window closes
     g_object_unref (store);

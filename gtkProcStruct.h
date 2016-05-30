@@ -19,7 +19,9 @@ void build_treeview (GtkWidget * treeview);
 
 void display (GtkWidget * treeview);
 
-gint sort_proc_names (GtkTreeModel * model, GtkTreeIter * a, GtkTreeIter *b, gpointer data);
+gint sort_alphabatize (GtkTreeModel * model, GtkTreeIter * a, GtkTreeIter *b, gpointer data);
+
+gint sort_numbers (GtkTreeModel * model, GtkTreeIter * a, GtkTreeIter * b, gpointer data);
 
 #endif
 
