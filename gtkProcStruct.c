@@ -25,7 +25,7 @@ void mem_float_cell_display (GtkTreeViewColumn* col,
 }
 
 
-// A helper function for build_treeview. Makes a long int have 2 places right of decimal. If i == 0, this will put the data in % mode. i ==1 will calc size.
+// A helper function for build_treeview. Makes a long int have 2 places right of decimal.
 void float_cell_display (GtkTreeViewColumn* col, 
                        GtkCellRenderer* renderer,
                        GtkTreeModel* model,
@@ -75,9 +75,6 @@ void build_treeview (GtkWidget *treeview) {
     
      // add the CPU % to the treeview
     renderer = gtk_cell_renderer_text_new();
-/*    column = gtk_tree_view_column_new_with_attributes ("\% CPU", renderer, "text", CPU_PERCENT, NULL);
-    gtk_tree_view_append_column (GTK_TREE_VIEW (treeview), column);
-*/
     column = gtk_tree_view_column_new ();
     gtk_tree_view_column_set_title (column, "\% CPU");
     gtk_tree_view_append_column (GTK_TREE_VIEW(treeview), column);
@@ -91,17 +88,17 @@ void build_treeview (GtkWidget *treeview) {
 
     // add Memory Usage to treeview
     renderer = gtk_cell_renderer_text_new();
-    column = gtk_tree_view_column_new_with_attributes (
+    /*column = gtk_tree_view_column_new_with_attributes (
                 "Memory", renderer, "text", MEM_USING,
                 NULL); 
     gtk_tree_view_append_column (GTK_TREE_VIEW (treeview), column);
-    /*column = gtk_tree_view_column_new ();
+    */
+    column = gtk_tree_view_column_new ();
     gtk_tree_view_column_set_title (column, "Memory");
     gtk_tree_view_append_column (GTK_TREE_VIEW(treeview), column);
     gtk_tree_view_column_pack_start(column, renderer, TRUE);
-    
     gtk_tree_view_column_set_cell_data_func (column, renderer, float_cell_display, GINT_TO_POINTER(MEM_USING) , NULL);
-   */ 
+    
 }
 
 void display (GtkWidget *treeview) {
