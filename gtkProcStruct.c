@@ -163,9 +163,9 @@ int main (int argc, char* argv[]) {
                                               G_TYPE_STRING, G_TYPE_STRING,
                                               G_TYPE_INT, G_TYPE_FLOAT, 
                                               GDK_TYPE_PIXBUF);
-
+    
     ****************************************************added for sorting
-    // make the treeview sortable on all categories
+     make the treeview sortable on all categories
     GtkTreeSortable *sortable = GTK_TREE_SORTABLE (store);
     
     gtk_tree_sortable_set_sort_func (sortable, PROC_NAME, sort_proc_names, 
@@ -173,8 +173,8 @@ int main (int argc, char* argv[]) {
     
     gtk_tree_sortable_set_sort_column_id (sortable, PROC_NAME,
                                           GTK_SORT_ASCENDING);
-    ****************************************************************
-
+    *****************************************************************
+    
     // create the tree view of the list (all the columns)
     GtkWidget *treeview = gtk_tree_view_new ();
     build_treeview(treeview);
