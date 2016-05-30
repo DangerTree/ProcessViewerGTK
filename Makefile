@@ -2,7 +2,7 @@ CFLAGS = -Wall -ggdb `pkg-config --cflags --libs gtk+-3.0`
 CC = gcc
 
 
-all : myproc testProcAccess
+all : testProcAccess
 
 myproc : myproc.c
 	$(CC) $@ $< -o $(CFLAGS)
