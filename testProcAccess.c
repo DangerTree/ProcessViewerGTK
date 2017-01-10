@@ -251,6 +251,8 @@ void refreshListStore (GtkListStore * store, GtkTreeIter * iter, int pidNum){
         LSpid = (int) LSpid;
         // delete the row from the listStore and pidList
         if (LSpid < pidNum){
+            free (pidArray [LSpid]->proc_name);
+            free (pidArray [LSpid]->user_name);
             pidArray [LSpid] = NULL;
             gtk_list_store_remove (GTK_LIST_STORE (store), iter);
             ctr ++;
